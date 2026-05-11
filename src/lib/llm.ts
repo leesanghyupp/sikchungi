@@ -33,20 +33,34 @@ const responseSchema = {
 
 const toGeminiContents = (messages: ChatMessage[]) =>
   messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
+    role: m.role === "assistant" ? ("model" as const) : ("user" as const),
     parts: [{ text: m.content }],
   }));
 
+type GenerateOptions = {
+  directFood?: string;
+};
+
+const buildSystemInstruction = (opts: GenerateOptions): string => {
+  if (!opts.directFood) return SYSTEM_PROMPT;
+  return `${SYSTEM_PROMPT}
+
+[OVERRIDE — 최우선]
+사용자 메시지에서 음식 "${opts.directFood}"가 명시적으로 언급됨. 추가 질문 절대 하지 말고 즉시 status="recommending"으로 답변. recommendations[0].name은 반드시 "${opts.directFood}". 나머지 2개는 "${opts.directFood}"와 결이 비슷한 다른 음식. contextSummary는 "${opts.directFood} 직접 요청 / ..." 형태로 시작.`;
+};
+
 export const generateRecommendation = async (
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  options: GenerateOptions = {}
 ): Promise<AgentResponse> => {
   const response = await ai.models.generateContent({
     model: MODEL,
     contents: toGeminiContents(messages),
     config: {
-      systemInstruction: SYSTEM_PROMPT,
+      systemInstruction: buildSystemInstruction(options),
       responseMimeType: "application/json",
       responseSchema,
+      temperature: 0.4,
     },
   });
 

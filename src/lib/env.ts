@@ -9,4 +9,5 @@ const required = (name: string): string => {
 export const env = {
   googleApiKey: required("GOOGLE_API_KEY"),
   unsplashAccessKey: required("UNSPLASH_ACCESS_KEY"),
+  kakaoRestApiKey: required("KAKAO_REST_API_KEY"),
 };

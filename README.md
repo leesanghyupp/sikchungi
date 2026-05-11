@@ -48,6 +48,7 @@
 | 스타일링 | Tailwind CSS v4 + shadcn/ui |
 | AI | Gemini 2.5 Flash (`@google/genai`) |
 | 이미지 | Unsplash API |
+| 위치/식당 | Kakao Local REST API |
 | 배포 | Vercel |
 
 ---
@@ -79,6 +80,7 @@ npm run dev
 |---|---|
 | `GOOGLE_API_KEY` | [Google AI Studio](https://aistudio.google.com) — 카드 등록 X, 즉시 발급 |
 | `UNSPLASH_ACCESS_KEY` | [Unsplash Developers](https://unsplash.com/developers) — 시간당 50req 무료 |
+| `KAKAO_REST_API_KEY` | [Kakao Developers](https://developers.kakao.com) — 일일 30만 req 무료 (근처 식당 검색용) |
 
 ---
 

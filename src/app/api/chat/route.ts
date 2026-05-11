@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { generateRecommendation } from "@/lib/llm";
+import { detectDirectFood } from "@/lib/foodKeywords";
 import type { ChatMessage } from "@/lib/types";
+
+const REJECTION_TOKENS = ["말고", "말구", "싫어", "별로", "안 먹", "안먹"];
+
+const isRejection = (text: string): boolean =>
+  REJECTION_TOKENS.some((t) => text.includes(t));
 
 export const POST = async (req: Request) => {
   let body: unknown;
@@ -18,8 +24,17 @@ export const POST = async (req: Request) => {
     );
   }
 
+  const typed = messages as ChatMessage[];
+  const lastUser = [...typed].reverse().find((m) => m.role === "user");
+  const lastText = lastUser?.content ?? "";
+
+  const directFood =
+    !isRejection(lastText) ? detectDirectFood(lastText) : null;
+
   try {
-    const result = await generateRecommendation(messages as ChatMessage[]);
+    const result = await generateRecommendation(typed, {
+      directFood: directFood ?? undefined,
+    });
     return NextResponse.json(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "unknown error";
