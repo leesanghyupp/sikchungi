@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ChatTest } from "./_ChatTest";
+import { ChatClient } from "./_ChatClient";
 
 export const metadata: Metadata = {
   title: "식충이 — 음식 추천 잼민이 친구",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <ChatTest />;
+  return <ChatClient />;
 }
