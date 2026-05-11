@@ -50,6 +50,15 @@ export const generateRecommendation = async (
     },
   });
 
+  const usage = response.usageMetadata;
+  if (usage) {
+    console.log(
+      `[gemini] prompt=${usage.promptTokenCount ?? "?"} cached=${
+        usage.cachedContentTokenCount ?? 0
+      } output=${usage.candidatesTokenCount ?? "?"}`
+    );
+  }
+
   const text = response.text;
   if (!text) {
     throw new Error("Gemini returned empty response");

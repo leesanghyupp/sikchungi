@@ -10,6 +10,8 @@ type Event =
   | { role: "user"; text: string }
   | { role: "assistant"; resp: AgentResponse };
 
+type ErrorInfo = { kind: "network" | "server"; message: string };
+
 const eventToApiMessage = (e: Event): ChatMessage =>
   e.role === "user"
     ? { role: "user", content: e.text }
@@ -29,7 +31,7 @@ export const ChatClient = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorInfo | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,12 +44,7 @@ export const ChatClient = () => {
     if (!loading) inputRef.current?.focus();
   }, [loading]);
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || loading) return;
-
-    const next: Event[] = [...events, { role: "user", text }];
-    setEvents(next);
-    setInput("");
+  const runCompletion = async (eventsToSend: Event[]) => {
     setLoading(true);
     setError(null);
 
@@ -55,21 +52,43 @@ export const ChatClient = () => {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next.map(eventToApiMessage) }),
+        body: JSON.stringify({ messages: eventsToSend.map(eventToApiMessage) }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? `HTTP ${res.status}`);
+        setError({
+          kind: "server",
+          message: data.error ?? `HTTP ${res.status}`,
+        });
         return;
       }
 
-      setEvents([...next, { role: "assistant", resp: data as AgentResponse }]);
+      setEvents([
+        ...eventsToSend,
+        { role: "assistant", resp: data as AgentResponse },
+      ]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "unknown error");
+      setError({
+        kind: "network",
+        message: e instanceof Error ? e.message : "unknown error",
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || loading) return;
+    const next: Event[] = [...events, { role: "user", text }];
+    setEvents(next);
+    setInput("");
+    await runCompletion(next);
+  };
+
+  const retryLast = () => {
+    if (loading) return;
+    void runCompletion(events);
   };
 
   const requestAnother = () => sendMessage("이거 말고 다른 거 ㄱㄱ");
@@ -143,9 +162,11 @@ export const ChatClient = () => {
           {loading && <LoadingBubble />}
 
           {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              에러: {error}
-            </div>
+            <ErrorBanner
+              error={error}
+              onRetry={retryLast}
+              disabled={loading}
+            />
           )}
 
           <div ref={bottomRef} />
@@ -212,16 +233,71 @@ const AssistantBubble = ({ text }: { text: string }) => (
   </div>
 );
 
-const LoadingBubble = () => (
-  <div className="flex items-start gap-2">
-    {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img
-      src="/mascot.svg"
-      alt="식충이"
-      className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-card p-0.5 ring-1 ring-border"
-    />
-    <div className="max-w-[80%] rounded-2xl rounded-tl-sm bg-card px-4 py-2 text-card-foreground ring-1 ring-border">
-      <p className="text-sm text-muted-foreground">생각 중... 🤔</p>
+const LOADING_MESSAGES_EARLY = [
+  "생각 중... 🤔",
+  "음... 뭐가 좋을까 🤤",
+  "머리 굴리는 중 🤖",
+];
+
+const LoadingBubble = () => {
+  const [elapsed, setElapsed] = useState(0);
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const t = setInterval(() => {
+      setElapsed(Date.now() - start);
+      setMsgIdx((i) => (i + 1) % LOADING_MESSAGES_EARLY.length);
+    }, 1500);
+    return () => clearInterval(t);
+  }, []);
+
+  const text =
+    elapsed > 6000
+      ? "거의 다 됨... 🔥"
+      : LOADING_MESSAGES_EARLY[msgIdx];
+
+  return (
+    <div className="flex items-start gap-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/mascot.svg"
+        alt="식충이"
+        className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-card p-0.5 ring-1 ring-border"
+      />
+      <div className="max-w-[80%] rounded-2xl rounded-tl-sm bg-card px-4 py-2 text-card-foreground ring-1 ring-border">
+        <p className="text-sm text-muted-foreground">{text}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+const ErrorBanner = ({
+  error,
+  onRetry,
+  disabled,
+}: {
+  error: ErrorInfo;
+  onRetry: () => void;
+  disabled: boolean;
+}) => {
+  const headline =
+    error.kind === "network"
+      ? "📡 인터넷 연결 확인해줘"
+      : "😵 식충이가 잠깐 멈췄어";
+
+  return (
+    <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+      <div className="font-medium text-destructive">{headline}</div>
+      <div className="text-destructive/80 text-xs">{error.message}</div>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onRetry}
+        disabled={disabled}
+      >
+        다시 시도 🔄
+      </Button>
+    </div>
+  );
+};

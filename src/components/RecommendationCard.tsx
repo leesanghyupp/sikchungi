@@ -7,11 +7,13 @@ import type { FoodRecommendation } from "@/lib/types";
 export const RecommendationCard = ({ rec }: { rec: FoodRecommendation }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setImageUrl(null);
+    setImgLoaded(false);
 
     fetch(`/api/image?q=${encodeURIComponent(rec.imageQuery)}`)
       .then((r) => r.json())
@@ -33,13 +35,18 @@ export const RecommendationCard = ({ rec }: { rec: FoodRecommendation }) => {
   return (
     <Card>
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
-        {loading && <div className="absolute inset-0 animate-pulse bg-muted" />}
+        {(loading || (imageUrl && !imgLoaded)) && (
+          <div className="absolute inset-0 animate-pulse bg-muted" />
+        )}
         {!loading && imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl}
             alt={rec.name}
-            className="h-full w-full object-cover"
+            onLoad={() => setImgLoaded(true)}
+            className={`h-full w-full object-cover transition-opacity duration-500 ${
+              imgLoaded ? "opacity-100" : "opacity-0"
+            }`}
           />
         )}
         {!loading && !imageUrl && (
